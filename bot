@@ -1,0 +1,88 @@
+echo "# bottelegram" >> README.md 
+git init 
+git add README.md 
+git commit -m "primeiro commit" 
+git branch -M main 
+git remote add origin https://github.com/mpbmateus/bottelegram.git
+ git push - sua origem principal
+import requests
+import time
+import json
+import threading
+
+class TelegramBot:
+    def __init__(self):
+        self.token = '6494757422:AAEkCXeZ8Hr7DGWEGbTKkL44EpduSXfIVEA'
+        self.url_base = f'https://api.telegram.org/bot{self.token}/'
+        self.ultimo_envio = {}  # Rastreia a última mensagem enviada para cada chat_id para a mensagem de acompanhamento
+
+    def iniciar(self):
+        update_id = None
+        threading.Thread(target=self.verificar_mensagem_tempo).start()  # Inicia a thread para verificar o tempo e enviar a mensagem promocional
+        while True:
+            atualizacao = self.obter_mensagens(update_id)
+            mensagens = atualizacao['result']
+            if mensagens:
+                for mensagem in mensagens:
+                    update_id = mensagem['update_id']
+                    if 'message' in mensagem:
+                        chat_id = mensagem['message']['chat']['id']
+                        texto = mensagem['message'].get('text', '')
+                        if texto == '/start':
+                            self.enviar_mensagem_botao(
+                                chat_id,
+                                "Opa, tudo bem? Então você quer acesso ao meu grupo onde vou dar várias premiações e vou dar dicas dos melhores jogos para ganhar muita grana?🚀",
+                                text_button="SIM"
+                            )
+                    elif 'callback_query' in mensagem:
+                        chat_id = mensagem['callback_query']['message']['chat']['id']
+                        data = mensagem['callback_query']['data']
+                        if data == "SIM":
+                            self.enviar_mensagem_botao(
+                                chat_id,
+                                "Clique no botão abaixo e entre no grupo GRATUITO e tenha acesso ao meu APP exclusivo e comece a ganhar DINHEIRO ainda HOJE comigo🤑👇🏽
+ \n\n🚨
+Observação: Assim que entrar, volte aqui que tenho um presente para você.",
+                                text_button="ACESSO AO GRUPO",
+                                url="https://t.me/+B4vqSz6EOdowNWYx"
+                            )
+                    self.ultimo_envio[chat_id] = time.time()
+            time.sleep(1)
+
+    def verificar_mensagem_tempo(self):
+        while True:
+            agora = time.time()
+            for chat_id, ultimo_tempo in list(self.ultimo_envio.items()):
+                if agora - ultimo_tempo >= 180:  # 180 segundos = 3 minutos
+                    self.enviar_mensagem(
+                        chat_id,
+                        "Agora que você entrou no grupo, vou te mandar o acesso ao meu aplicativo! Quando você cadastra e depois realiza seu primeiro deposito, você começa a concorrer aos sorteios que faço no meu grupo 🚀\n\nPara se cadastrar, basta clicar no link abaixo 👇🏽\n\nhttps://bit.ly/lucroaltotl"
+                    )
+                    del self.ultimo_envio[chat_id]  # Remove o chat_id para evitar repetições
+            time.sleep(30)  # Diminui carga de processamento verificando a cada 30 segundos
+
+    def obter_mensagens(self, update_id):
+        link_requisicao = f'{self.url_base}getUpdates?timeout=100'
+        if update_id:
+            link_requisicao += f'&offset={update_id + 1}'
+        resultado = requests.get(link_requisicao)
+        return resultado.json() if resultado.status_code == 200 else []
+
+    def enviar_mensagem_botao(self, chat_id, mensagem, text_button=None, url=None):
+        buttons = {"inline_keyboard": [[{"text": text_button, "url": url} if url else {"text": text_button, "callback_data": text_button}]]}
+        params = {
+            "chat_id": chat_id,
+            "text": mensagem,
+            "reply_markup": json.dumps(buttons)
+        }
+        resposta = requests.post(f'{self.url_base}sendMessage', data=params)
+        print(resposta.json())
+
+    def enviar_mensagem(self, chat_id, mensagem):
+        params = {"chat_id": chat_id, "text": mensagem}
+        resposta = requests.post(f'{self.url_base}sendMessage', data=params)
+        print(resposta.json())
+
+# Lembre-se de substituir 'SEU_TOKEN_AQUI' pelo token do seu bot.
+bot = TelegramBot()
+bot.iniciar()
